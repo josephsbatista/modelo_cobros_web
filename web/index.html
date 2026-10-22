@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Privacidad: el navegador solo puede leer archivos de este mismo sitio (el modelo);
+     no puede enviar lo que se mueve en los deslizadores a ningún otro servidor. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'">
 <title>No pago de cuota</title>
 <meta name="description" content="Demo del bosque aleatorio que predice el no pago de cuota en Bodytech. El modelo corre en el navegador.">
 <style>
