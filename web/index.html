@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>No pago de cuota</title>
+<meta name="description" content="Demo del bosque aleatorio que predice el no pago de cuota en Bodytech. El modelo corre en el navegador.">
+<style>
+  :root {
+    --azul: #2a78d6; --naranja: #eb6834; --gris: #b9b9b3;
+    --tinta: #1a1a19; --tinta2: #52514e; --linea: #e4e4de;
+    --fondo: #f7f7f4; --tarjeta: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --gris: #6c6c66; --tinta: #f1f1ec; --tinta2: #b6b6ae; --linea: #34342f;
+      --fondo: #161614; --tarjeta: #1f1f1c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fondo); color: var(--tinta);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .envoltura { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { margin: 0 0 4px; font-size: 1.7rem; letter-spacing: -.01em; }
+  header p { margin: 0; color: var(--tinta2); max-width: 760px; }
+  .pestanas { display: flex; gap: 4px; margin: 24px 0 16px; border-bottom: 1px solid var(--linea); }
+  .pestanas button {
+    font: inherit; background: none; border: 0; padding: 10px 14px; cursor: pointer;
+    color: var(--tinta2); border-bottom: 3px solid transparent; margin-bottom: -1px;
+  }
+  .pestanas button[aria-selected="true"] { color: var(--tinta); border-bottom-color: var(--azul); font-weight: 600; }
+  .rejilla { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 820px) { .rejilla { grid-template-columns: 1fr; } }
+  .tarjeta { background: var(--tarjeta); border: 1px solid var(--linea); border-radius: 12px; padding: 20px; }
+  label.campo { display: block; margin: 0 0 16px; }
+  .campo .titulo { display: flex; justify-content: space-between; gap: 12px; font-size: .92rem; color: var(--tinta2); }
+  .campo .valor { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--azul); margin-top: 6px; }
+  select { font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--linea);
+           background: var(--tarjeta); color: var(--tinta); margin-top: 6px; }
+  .decision { border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; }
+  .decision.notificar { background: color-mix(in srgb, var(--naranja) 14%, transparent); border-left: 5px solid var(--naranja); }
+  .decision.no { background: color-mix(in srgb, var(--azul) 10%, transparent); border-left: 5px solid var(--gris); }
+  .decision strong { display: block; font-size: 1.5rem; letter-spacing: .02em; }
+  .cifras { display: flex; gap: 28px; flex-wrap: wrap; margin: 0 0 8px; }
+  .cifras div span { display: block; font-size: .82rem; color: var(--tinta2); }
+  .cifras div b { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+  svg { width: 100%; height: auto; display: block; }
+  .notas { color: var(--tinta2); font-size: .88rem; padding-left: 18px; margin: 12px 0 0; }
+  .figura { margin: 0 0 28px; }
+  .figura h3 { margin: 0 0 2px; font-size: 1.1rem; }
+  .figura p { margin: 0 0 10px; color: var(--tinta2); }
+  .figura img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--linea); background: #fff; }
+  .carga { text-align: center; padding: 48px 16px; color: var(--tinta2); }
+  .barra { height: 6px; background: var(--linea); border-radius: 3px; max-width: 360px; margin: 14px auto 0; overflow: hidden; }
+  .barra div { height: 100%; width: 0; background: var(--azul); transition: width .2s; }
+  footer { margin-top: 32px; color: var(--tinta2); font-size: .85rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="envoltura">
+  <header>
+    <h1>Predicción de no pago de cuota · Bodytech</h1>
+    <p>Bosque aleatorio de 300 árboles entrenado sobre el segmento de prevención (líneas activas).
+       Se decide <b>3 días antes del corte</b> y se notifica al <b id="txt-cupo">20 %</b> de cuotas con mayor puntaje.
+       El modelo corre en tu navegador: no hay servidor y no se envía ningún dato.</p>
+  </header>
+
+  <nav class="pestanas" role="tablist">
+    <button role="tab" aria-selected="true" data-panel="panel-demo">Demo</button>
+    <button role="tab" aria-selected="false" data-panel="panel-resultados">Resultados</button>
+  </nav>
+
+  <section id="panel-demo" role="tabpanel">
+    <div id="carga" class="carga">
+      <div id="carga-texto">Cargando el modelo (unos 12 MB)…</div>
+      <div class="barra"><div id="carga-barra"></div></div>
+    </div>
+    <div id="demo" class="rejilla" hidden>
+      <div class="tarjeta">
+        <label class="campo">
+          <span class="titulo">Perfil de partida</span>
+          <select id="perfil"></select>
+        </label>
+        <div id="deslizadores"></div>
+      </div>
+      <div class="tarjeta">
+        <div id="decision" class="decision no"><strong>—</strong><span></span></div>
+        <div class="cifras">
+          <div><span>Puntaje de riesgo</span><b id="puntaje">—</b></div>
+          <div><span>Umbral del cupo</span><b id="umbral">—</b></div>
+          <div><span>Más riesgoso que</span><b id="percentil">—</b></div>
+        </div>
+        <svg id="grafica" viewBox="0 0 560 270" role="img" aria-label="Distribución de puntajes de validación y posición del perfil"></svg>
+        <ul class="notas">
+          <li>El puntaje <b>ordena</b> las cuotas por riesgo; no es una probabilidad calibrada.</li>
+          <li>Cada perfil es la mediana de un grupo del entrenamiento; los deslizadores mueven solo esas
+              variables y el resto queda en el valor del perfil.</li>
+          <li>La página no contiene registros de afiliados.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-resultados" role="tabpanel" hidden>
+    <p>Figuras del notebook de modelado, con los resultados de validación cruzada y del conjunto de
+       prueba (consultado una sola vez).</p>
+    <div id="figuras"></div>
+  </section>
+
+  <footer>
+    Proyecto final · Machine Learning I · Universidad EAN. Antes de cada publicación, una prueba de
+    paridad verifica que esta página da el mismo puntaje que scikit-learn.
+  </footer>
+</div>
+
+<script src="motor.js"></script>
+<script>
+'use strict';
+const ETIQUETAS = {
+  max_atraso_90d: 'Máximo atraso en las cuotas de los últimos 90 días (días)',
+  desfase_prom: 'Desfase promedio entre el corte y el pago (días)',
+  dias_desde_ultimo_ingreso: 'Días desde la última entrada al gimnasio',
+  pagos_previos_90d: 'Cuotas pagadas en los últimos 90 días',
+  antiguedad_dias: 'Antigüedad de la compra (días)',
+  asist_b1: 'Días de asistencia en el último mes',
+  links_otros_90d: 'Días con link de pago en los últimos 90 días',
+};
+const DECIMALES = { desfase_prom: 1 };
+const FIGURAS = [
+  ['F1_resultado_vs_linea_base.png', 'Resultado frente a la regla de negocio y al azar',
+   'Exhaustividad al cupo del 20 %: validación cruzada (barras) y conjunto de prueba (rombos).'],
+  ['F3_curva_de_cupo.png', 'La curva de cupo',
+   'Qué fracción de los impagos se alcanza a avisar para cada capacidad de cobranza.'],
+  ['F2_pliegues_por_modelo.png', 'Los cinco pliegues de cada modelo',
+   'La dispersión entre pliegues es el argumento del empate entre bosque y boosting.'],
+  ['F4_brecha_sesgo_varianza.png', 'Brecha entre ajuste y validación',
+   'Sin límite por hoja el bosque memoriza el entrenamiento y valida peor.'],
+  ['F5_equidad_por_sede.png', 'Equidad por categoría de sede',
+   'Exhaustividad y fracción contactada de cada categoría frente al piso de los cuatro quintos.'],
+  ['F6_importancia_permutacion.png', 'Importancia por permutación',
+   'Pérdida de exhaustividad al permutar cada variable, medida sobre validación.'],
+];
+const PERFIL_INICIAL = 'Paga tarde a veces';
+const coma = (v, d = 3) => v.toLocaleString('es-CO', { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (v) => `${Math.round(v * 100)} %`;
+
+// --- Pestañas -----------------------------------------------------------------
+document.querySelectorAll('.pestanas button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('.pestanas button').forEach((o) => o.setAttribute('aria-selected', o === b));
+  document.querySelectorAll('[role="tabpanel"]').forEach((p) => { p.hidden = p.id !== b.dataset.panel; });
+}));
+document.getElementById('figuras').innerHTML = FIGURAS.map(([f, t, d]) =>
+  `<figure class="figura"><h3>${t}</h3><p>${d}</p><img src="figuras/${f}" alt="${t}" loading="lazy"></figure>`).join('');
+
+// --- Carga del modelo, con progreso -------------------------------------------
+async function descargar(url, alAvanzar) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url}: ${r.status}`);
+  const total = Number(r.headers.get('content-length')) || 0;
+  const lector = r.body.getReader();
+  const partes = [];
+  let recibido = 0;
+  for (;;) {
+    const { done, value } = await lector.read();
+    if (done) break;
+    partes.push(value);
+    recibido += value.length;
+    if (total) alAvanzar(recibido / total);
+  }
+  const datos = new Uint8Array(recibido);
+  let o = 0;
+  for (const p of partes) { datos.set(p, o); o += p.length; }
+  return datos;
+}
+
+async function descomprimir(bytes) {
+  // Si el servidor ya lo entregó descomprimido, no empieza con la firma gzip (1f 8b)
+  if (!(bytes[0] === 0x1f && bytes[1] === 0x8b)) return bytes.buffer;
+  const flujo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return await new Response(flujo).arrayBuffer();
+}
+
+async function iniciar() {
+  const barra = document.getElementById('carga-barra');
+  const [cfg, comprimido] = await Promise.all([
+    fetch('modelo.json').then((r) => r.json()),
+    descargar('modelo.bin.gz', (f) => { barra.style.width = `${Math.round(f * 100)}%`; }),
+  ]);
+  document.getElementById('carga-texto').textContent = 'Preparando los 300 árboles…';
+  const motor = Motor.crearMotor(await descomprimir(comprimido), cfg);
+  montarDemo(cfg, motor);
+  document.getElementById('carga').hidden = true;
+  document.getElementById('demo').hidden = false;
+}
+
+// --- Distribución de puntajes (desde los cuantiles de validación, valores agregados) --
+function histograma(cuantiles, nBarras = 40) {
+  const n = cuantiles.length - 1, muestras = 4000, conteo = new Array(nBarras).fill(0);
+  for (let i = 0; i <= muestras; i++) {
+    const pos = (i / muestras) * n, j = Math.min(Math.floor(pos), n - 1), f = pos - j;
+    const v = cuantiles[j] + (cuantiles[j + 1] - cuantiles[j]) * f;
+    conteo[Math.min(nBarras - 1, Math.floor(v * nBarras))]++;
+  }
+  return conteo.map((c) => c / (muestras + 1));
+}
+
+function dibujar(svg, fracciones, umbral, p) {
+  const W = 560, H = 270, iz = 46, de = 12, ar = 36, ab = 46;
+  const ancho = W - iz - de, alto = H - ar - ab, maximo = Math.max(...fracciones) * 1.08;
+  const x = (v) => iz + v * ancho, y = (v) => ar + alto - (v / maximo) * alto;
+  const nb = fracciones.length, w = ancho / nb;
+  let s = `<text x="${iz}" y="18" font-size="15" fill="var(--tinta)">Dónde cae frente a las cuotas de validación (azul = se notifica)</text>`;
+  for (let t = 0; t <= maximo; t += 0.02) {
+    s += `<line x1="${iz}" x2="${W - de}" y1="${y(t)}" y2="${y(t)}" stroke="var(--linea)"/>` +
+         `<text x="${iz - 6}" y="${y(t) + 4}" font-size="13" text-anchor="end" fill="var(--tinta2)">${Math.round(t * 100)} %</text>`;
+  }
+  fracciones.forEach((f, i) => {
+    const centro = (i + 0.5) / nb;
+    s += `<rect x="${x(i / nb) + w * 0.04}" y="${y(f)}" width="${w * 0.92}" height="${y(0) - y(f)}" ` +
+         `fill="${centro >= umbral ? 'var(--azul)' : 'var(--gris)'}"/>`;
+  });
+  for (let t = 0; t <= 1.001; t += 0.2) {
+    s += `<text x="${x(t)}" y="${H - 26}" font-size="13" text-anchor="middle" fill="var(--tinta2)">${coma(t, 1)}</text>`;
+  }
+  s += `<text x="${iz + ancho / 2}" y="${H - 4}" font-size="14" text-anchor="middle" fill="var(--tinta2)">Puntaje de riesgo</text>`;
+  s += `<line x1="${x(umbral)}" x2="${x(umbral)}" y1="${ar}" y2="${y(0)}" stroke="var(--tinta)" stroke-dasharray="4 3"/>` +
+       `<text x="${x(umbral) + 6}" y="${ar + 14}" font-size="13" fill="var(--tinta)">umbral del cupo</text>`;
+  const izquierda = p < 0.78;
+  s += `<line x1="${x(p)}" x2="${x(p)}" y1="${ar}" y2="${y(0)}" stroke="var(--naranja)" stroke-width="3.5"/>` +
+       `<text x="${x(p) + (izquierda ? 8 : -8)}" y="${ar + alto * 0.45}" font-size="16" font-weight="700" ` +
+       `text-anchor="${izquierda ? 'start' : 'end'}" fill="var(--naranja)" stroke="var(--tarjeta)" stroke-width="4" ` +
+       `paint-order="stroke">este perfil</text>`;
+  svg.innerHTML = s;
+}
+
+// --- Demo -----------------------------------------------------------------------
+function montarDemo(cfg, motor) {
+  document.getElementById('txt-cupo').textContent = pct(cfg.cupo);
+  const selector = document.getElementById('perfil');
+  selector.innerHTML = Object.keys(cfg.perfiles).map((n) => `<option>${n}</option>`).join('');
+  selector.value = PERFIL_INICIAL;
+
+  const caja = document.getElementById('deslizadores');
+  const controles = {};
+  for (const v of cfg.deslizadores) {
+    const [lo, hi] = cfg.rangos[v], dec = DECIMALES[v] || 0;
+    caja.insertAdjacentHTML('beforeend',
+      `<label class="campo"><span class="titulo">${ETIQUETAS[v]}<span class="valor" id="v-${v}"></span></span>` +
+      `<input type="range" id="d-${v}" min="${Math.floor(lo)}" max="${Math.ceil(hi)}" step="${dec ? 0.1 : 1}"></label>`);
+    controles[v] = document.getElementById(`d-${v}`);
+  }
+
+  const fracciones = histograma(cfg.cuantiles_oof);
+  const svg = document.getElementById('grafica');
+  document.getElementById('umbral').textContent = coma(cfg.umbral);
+
+  function actualizar() {
+    const fila = Object.assign({}, cfg.perfiles[selector.value]);
+    for (const v of cfg.deslizadores) {
+      fila[v] = Number(controles[v].value);
+      document.getElementById(`v-${v}`).textContent = coma(fila[v], DECIMALES[v] || 0);
+    }
+    const p = motor.puntuar(fila);
+    const q = cfg.cuantiles_oof;
+    let k = 0;
+    while (k < q.length && q[k] <= p) k++;
+    const percentil = Math.max(0, k - 1) / (q.length - 1);
+    const notificar = p >= cfg.umbral;
+    const caja = document.getElementById('decision');
+    caja.className = `decision ${notificar ? 'notificar' : 'no'}`;
+    caja.innerHTML = notificar
+      ? `<strong>NOTIFICAR</strong><span>Queda dentro del ${pct(cfg.cupo)} de cuotas con mayor riesgo.</span>`
+      : `<strong>No contactar</strong><span>Queda fuera del ${pct(cfg.cupo)} de cuotas con mayor riesgo.</span>`;
+    document.getElementById('puntaje').textContent = coma(p);
+    document.getElementById('percentil').textContent = pct(percentil);
+    dibujar(svg, fracciones, cfg.umbral, p);
+  }
+
+  function cargarPerfil() {
+    const perfil = cfg.perfiles[selector.value];
+    for (const v of cfg.deslizadores) controles[v].value = perfil[v];
+    actualizar();
+  }
+  selector.addEventListener('change', cargarPerfil);
+  for (const v of cfg.deslizadores) controles[v].addEventListener('input', actualizar);
+  cargarPerfil();
+}
+
+iniciar().catch((e) => {
+  document.getElementById('carga-texto').textContent =
+    `No se pudo cargar el modelo (${e.message}). Prueba con un navegador actualizado.`;
+});
+</script>
+</body>
+</html>
